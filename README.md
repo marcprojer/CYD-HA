@@ -33,11 +33,26 @@ A comprehensive ESPHome configuration for the ESP32-2432S028R (Cheap Yellow Disp
 - **ILI9341 Display** (320x240 pixels, included with CYD)
 - **XPT2046 Touch Controller** (included with CYD)
 - **Font Files**: Arimo-Regular.ttf and Material Design Icons font
+- **3D Printed Case**: Custom designed enclosure for desktop mounting (optional)
+
+### 🏠 3D Printed Case
+
+A custom case has been designed in Autodesk Fusion 360 specifically for this CYD touchscreen project. The case provides:
+
+- **Desktop Stand**: Angled display for optimal viewing
+- **Cable Management**: Clean routing for USB power cable
+- **Access Ports**: Easy access to all connectors and buttons
+- **Protective Housing**: Shields the board while maintaining touch functionality
+
+**Download**: [CYD Case.f3d](./CYD%20Case.f3d) - Fusion 360 design file
+
+*Print Settings: 0.2mm layer height, 15-20% infill, supports not required for overhangs*
 
 ## 📁 Project Structure
 
 ```
 ├── prod.yaml                    # Main ESPHome configuration
+├── CYD Case.f3d                 # 3D printable case (Fusion 360)
 ├── fonts/
 │   ├── Arimo-Regular.ttf        # Primary text font
 │   └── materialdesignicons-webfont.ttf  # Icon font
