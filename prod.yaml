@@ -329,30 +329,6 @@ text_sensor:
               snprintf(buf, sizeof(buf), "%s", icon.c_str());
               return buf;
 
-
-  - platform: homeassistant
-    id: dinolampe
-    entity_id: switch.dinolampe
-    on_value:
-      then:
-        - lvgl.widget.update:
-            id: btn_6
-            state:
-              checked: !lambda return (0 == x.compare(std::string{"on"}));
-              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
-        - lvgl.label.update:
-            id: lbl_btn_6
-            text: !lambda |-
-              static char buf[10];
-              std::string icon;
-              if (0 == x.compare(std::string{"on"})) {
-                  icon = "󱍢";
-              } else {
-                  icon = "󱍢";
-              }
-              snprintf(buf, sizeof(buf), "%s", icon.c_str());
-              return buf;
-
   - platform: homeassistant
     id: drucker_cr10
     entity_id: switch.drucker
@@ -704,19 +680,6 @@ lvgl:
                         text: "󰤝"
                         text_font: font_mdi
                         align: center
-                  on_click:
-                    then:
-                      - homeassistant.action:
-                          action: switch.toggle
-                          data:
-                            entity_id: switch.dinolampe
-                      - binary_sensor.template.publish:
-                          id: button_3_pressed
-                          state: ON
-                      - delay: 500ms
-                      - binary_sensor.template.publish:
-                          id: button_3_pressed
-                          state: OFF
 
               - button:
                   id: btn_7
