@@ -1,0 +1,941 @@
+substitutions:
+  device_name: cydho
+  friendly_name: CYD Home Office
+
+esphome:
+  name: $device_name
+  friendly_name: $friendly_name
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_pw_CYD
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Cyd-Home-Office Fallback Hotspot"
+    password: !secret fb_pw_CYD
+
+captive_portal:
+
+# Time component for scheduled anti-burn pixel training
+time:
+  - platform: sntp
+    id: sntp_time
+    timezone: Europe/Zurich  # Adjust to your timezone
+    servers:
+      - 0.pool.ntp.org
+      - 1.pool.ntp.org
+      - 2.pool.ntp.org
+    # Schedule pixel training 4 times per night (2,3,4,5 AM) for 30 minutes each
+    on_time:
+      - hours: 2,5,8
+        minutes: 5
+        seconds: 0
+        then:
+          - switch.turn_on: switch_antiburn
+      - hours: 2,5,8
+        minutes: 35
+        seconds: 0
+        then:
+          - switch.turn_off: switch_antiburn
+
+font:
+  - file: "fonts/Arimo-Regular.ttf"  # Path to main font file
+    id: arimo36                                         # ID used to reference this font
+    size: 36                                            # Font size
+    glyphs:                                             # Characters to include in font. Only 
+      - " .,:°%0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+  - file: "fonts/Arimo-Regular.ttf"  # Path to main font file
+    id: arimo30                                         # ID used to reference this font
+    size: 30                                            # Font size
+    glyphs:                                             # Characters to include in font. Only 
+      - " .,:°%0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+  - file: "fonts/Arimo-Regular.ttf"                     # Giving an ID for a larger size of that font.
+    id: arimo14
+    size: 14
+    glyphs:
+      - "0123456789"
+  - file: fonts/materialdesignicons-webfont.ttf         # Defining Material Design Icons as a font. This
+    id: font_mdi                                       # will allow us to use them as button icons.
+    size: 48                                            # You can get these glyphs from the https://pictogrammers.com/library/mdi/
+    glyphs:                                             # where you choose the icon, and then "copy glyph".
+      - 󱟴  # lightbulb-spot
+      - 󱟵  # lightbulb-spot-off
+      - 󰛨  # lightbulb-on
+      - 󰌶  # lightbulb-off
+      - 󱬠  # desk-lamp
+      - 󱬟  # desk-lamp-off
+      - 󱙷  # snail
+      - 󰐫  # printer-3d
+      - 󱬎  # printer-3d-off
+      - 󰟽  # 3D logo
+      - 󰌑  # return icon
+      - 󱁑  # led-strip
+      - 󱩋  # led-stripe-off
+      - 󰖪  # no-wifi
+      - 󱍢  # dino
+
+# Defines the colors we want to use later for the different buttons.
+# Per-button customizable colors
+color:
+  - id: room_bg_color
+    hex: "000000"
+  - id: default_button_bg_color
+    hex: "000000"
+  - id: default_button_pressed_bg_color
+    hex: "D3D3D3"
+#  - id: btn_1_color
+#    hex: "FFFFFF"                  # White
+#  - id: btn_2_color
+#    hex: "FFFFFF"                  # White
+#  - id: btn_3_color
+#    hex: "FFFFFF"                  # White
+
+# ============================================================ 
+# Home Assistant related setup
+# ============================================================
+
+# Setting the single channel backlight as a light entity in Home Assistant
+light:
+  - platform: monochromatic
+    output: backlight_pwm
+    name: Display Backlight
+    id: backlight
+    restore_mode: ALWAYS_ON
+
+# ==== Touch Button Sensors for Home Assistant ====
+binary_sensor:
+  - platform: template
+    name: "Button 1"
+    id: button_1_pressed
+  - platform: template
+    name: "Button 2"
+    id: button_2_pressed
+  - platform: template
+    name: "Button 3"
+    id: button_3_pressed
+  - platform: template
+    name: "Button 4"
+    id: button_4_pressed
+  - platform: template
+    name: "Button 5"
+    id: button_5_pressed
+  - platform: template
+    name: "Button 6"
+    id: button_6_pressed
+
+# Page 2
+  - platform: template
+    name: "Button 10"
+    id: button_10_pressed
+  - platform: template
+    name: "Button 11"
+    id: button_11_pressed
+  - platform: template
+    name: "Button 12"
+    id: button_12_pressed
+  - platform: template
+    name: "Button 13"
+    id: button_13_pressed
+  - platform: template
+    name: "Button 14"
+    id: button_14_pressed
+
+# Anti-burn switch for LVGL pixel exercising
+switch:
+  - platform: template
+    name: "Anti-burn Pixel Training"
+    id: switch_antiburn
+    icon: mdi:television-shimmer
+    optimistic: true
+    entity_category: "config"
+    turn_on_action:
+      - logger.log: "Starting Anti-burn pixel training"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+      - lvgl.pause:
+          show_snow: true
+    turn_off_action:
+      - logger.log: "Stopping Anti-burn pixel training"
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+
+# These sensors mirror the state of Home Assistant entities on boot,
+# or whenever the entity's state changes. 
+text_sensor:
+# Show Dyson vent air quality index on btn_9
+  - platform: homeassistant
+    id: dyson_vent_aqi
+    entity_id: sensor.dyson_vent_air_quality_index
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_btn_9
+            text: !lambda |-
+              static char buf[8];
+              int aqi = 0;
+              if (!x.empty()) {
+                aqi = std::stoi(x);
+              }
+              snprintf(buf, sizeof(buf), "%d", aqi);
+              return buf;
+
+# Show Dyson vent humidity on btn_8
+  - platform: homeassistant
+    id: dyson_vent_humidity
+    entity_id: sensor.dyson_vent_humidity
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_btn_8
+            text: !lambda |-
+              static char buf[16];
+              float hum = 0.0f;
+              if (!x.empty()) {
+                hum = std::stof(x);
+              }
+              snprintf(buf, sizeof(buf), "%.1f%%", hum);
+              return buf;
+
+# Show Dyson vent temperature on btn_7
+  - platform: homeassistant
+    id: dyson_vent_temperature
+    entity_id: sensor.dyson_vent_temperature
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_btn_7
+            text: !lambda |-
+              static char buf[16];
+              float temp = 0.0f;
+              if (!x.empty()) {
+                temp = std::stof(x);
+              }
+              snprintf(buf, sizeof(buf), "%.1f°C", temp);
+              return buf;
+
+  - platform: homeassistant
+    id: decke_homeoffice
+    entity_id: light.decke_homeoffice
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_1
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_1
+            text: !lambda |-
+              static char buf[10];
+              std::string icon;
+              if (0 == x.compare(std::string{"on"})) {
+                  icon = "󰛨";  // mdi:lightbulb-on
+              } else {
+                  icon = "󰌶";  // lightbulb-off
+              }
+              snprintf(buf, sizeof(buf), "%s", icon.c_str());
+              return buf;
+
+  - platform: homeassistant
+    id: spots_ho
+    entity_id: light.spots_ho
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_2
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_2
+            text: !lambda |-
+              static char buf[10];
+              std::string icon;
+              if (0 == x.compare(std::string{"on"})) {
+                  icon = "󱟴";  // mdi:led-strip-variant
+              } else {
+                  icon = "󱟵";  // mdi:led-strip-variant-off
+              }
+              snprintf(buf, sizeof(buf), "%s", icon.c_str());
+              return buf;
+
+  - platform: homeassistant
+    id: homeoffice_desklamp
+    entity_id: light.homeoffice_desklamp
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_3
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_3
+            text: !lambda |-
+              static char buf[10];
+              std::string icon;
+              if (0 == x.compare(std::string{"on"})) {
+                  icon = "󱬠";  // mdi:desk-lamp
+              } else {
+                  icon = "󱬟";  // mdi:desk-lamp-off
+              }
+              snprintf(buf, sizeof(buf), "%s", icon.c_str());
+              return buf;
+
+  - platform: homeassistant
+    id: drucker_3d
+    entity_id: switch.3d_drucker
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_10
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_10
+            text: !lambda |-
+              static char buf[10];
+              std::string icon;
+              if (0 == x.compare(std::string{"on"})) {
+                  icon = "󰐫";
+              } else {
+                  icon = "󱬎";
+              }
+              snprintf(buf, sizeof(buf), "%s", icon.c_str());
+              return buf;
+
+
+  - platform: homeassistant
+    id: dinolampe
+    entity_id: switch.dinolampe
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_6
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_6
+            text: !lambda |-
+              static char buf[10];
+              std::string icon;
+              if (0 == x.compare(std::string{"on"})) {
+                  icon = "󱍢";
+              } else {
+                  icon = "󱍢";
+              }
+              snprintf(buf, sizeof(buf), "%s", icon.c_str());
+              return buf;
+
+  - platform: homeassistant
+    id: drucker_cr10
+    entity_id: switch.drucker
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_11
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_11
+            text: "CR10"
+
+  - platform: homeassistant
+    id: drucker_cr6
+    entity_id: switch.drucker2
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_12
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_12
+            text: "CR6"
+
+  - platform: homeassistant
+    id: cr10_leds
+    entity_id: switch.cr10_leds
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_13
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_13
+            text: !lambda |-
+              static char buf[10];
+              std::string icon;
+              if ((0 == x.compare(std::string{"unavailable"})) || (0 == x.compare(std::string{"unknown"}))) {
+                icon = "󰖪"; // no-wifi icon for unreachable (new icon placed here)
+              } else if (0 == x.compare(std::string{"on"})) {
+                icon = "󱁑"; // led-strip icon for ON
+              } else {
+                icon = "󱩋"; // led-stripe-off icon for OFF
+              }
+              snprintf(buf, sizeof(buf), "%s", icon.c_str());
+              return buf;
+
+
+  - platform: homeassistant
+    id: cr6_leds
+    entity_id: switch.cr6_leds
+    on_value:
+      then:
+        - lvgl.widget.update:
+            id: btn_14
+            state:
+              checked: !lambda return (0 == x.compare(std::string{"on"}));
+              disabled: !lambda return ((0 == x.compare(std::string{"unavailable"})) or (0 == x.compare(std::string{"unknown"})));
+        - lvgl.label.update:
+            id: lbl_btn_14
+            text: !lambda |-
+              static char buf[10];
+              std::string icon;
+              if ((0 == x.compare(std::string{"unavailable"})) || (0 == x.compare(std::string{"unknown"}))) {
+                icon = "󰖪"; // no-wifi icon for unreachable (new icon placed here)
+              } else if (0 == x.compare(std::string{"on"})) {
+                icon = "󱁑"; // led-strip icon for ON
+              } else {
+                icon = "󱩋"; // led-stripe-off icon for OFF
+              }
+              snprintf(buf, sizeof(buf), "%s", icon.c_str());
+              return buf;
+
+# Current time sensor for middle button display
+  - platform: template
+    name: "Current Time"
+    id: current_time_display
+    update_interval: 1s
+    lambda: |-
+      auto time = id(sntp_time).now();
+      if (!time.is_valid()) {
+        return std::string{"--:--"};
+      }
+      static char buf[16];
+      snprintf(buf, sizeof(buf), "%02d:%02d", time.hour, time.minute);
+      return std::string{buf};
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lbl_btn_5
+            text: !lambda |-
+              return x.c_str();
+
+# ============================================================ 
+# Touchscreen Display related setup
+# ============================================================
+
+# SPI bus for TFT display and touch controller
+spi:
+  - id: tft
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+    miso_pin: GPIO12
+  - id: touch
+    clk_pin: GPIO25
+    mosi_pin: GPIO32
+    miso_pin: GPIO39
+
+# Set a pin to control the backlight
+output:
+  - platform: ledc
+    pin: GPIO21
+    id: backlight_pwm
+
+# Tracks if recent touch occurred
+globals:
+  - id: recent_touch
+    type: bool
+    restore_value: no
+    initial_value: "true"
+
+# Defining the touchscreen for later use
+touchscreen:
+  platform: xpt2046
+  spi_id: touch
+  cs_pin: GPIO33
+  interrupt_pin: GPIO36
+  update_interval: 50ms
+  threshold: 400
+  calibration:
+    x_min: 180
+    x_max: 3800
+    y_min: 240
+    y_max: 3860
+  transform:
+    swap_xy: true
+  id: my_touch
+  on_release:
+    then:
+      - if:
+          condition: lvgl.is_paused
+          then:
+            - logger.log: "Touch detected - stopping anti-burn pixel training"
+            - lvgl.resume:
+            - lvgl.widget.redraw:
+            - switch.turn_off: switch_antiburn
+
+# Defining the display type and properties, and defining the buttons displayed.
+display:
+  - platform: ili9xxx
+    id: my_display
+    color_palette: 8BIT               # Lower memory usage
+    model: ili9341                    # Display driver model
+    spi_id: tft
+    cs_pin: GPIO15
+    dc_pin: GPIO2
+    dimensions:
+      width: 320
+      height: 240
+    invert_colors: false
+    transform:
+      swap_xy: true
+    update_interval: never
+    auto_clear_enabled: false
+    show_test_card: false
+
+# Defining the buttons displayed
+lvgl:
+  buffer_size: 25%
+  displays:
+    - my_display
+  touchscreens:
+    - my_touch
+  page_wrap: false
+  theme:
+    button:
+      # Match E32R35T theme exactly
+      bg_color: 0x000000
+      bg_opa: COVER
+      border_color: 0xFFFFFF
+      border_width: 1
+      text_color: 0xFFFFFF
+      pressed:
+        bg_color: 0xC0C0C0
+        bg_grad_color: 0xC0C0C0
+        bg_opa: COVER
+      checked:
+        bg_color: 0xFFFFFF
+        bg_grad_color: 0xFFFFFF
+        bg_opa: COVER
+        text_color: 0xFFFF00  # yellow icon when checked
+  pages:
+    - id: main_page
+      pad_all: 0
+      widgets:
+        - obj:
+            width: 320
+            height: 240
+            bg_color: room_bg_color
+            layout:
+              type: grid
+              grid_columns: [fr(1), fr(1), fr(1)]
+              grid_rows: [fr(1), fr(1), fr(1)]
+            pad_all: 5px
+            outline_pad: 5px
+            widgets:
+              # ...existing code...
+              - button:
+                  id: btn_1
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 0
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  checkable: true
+                  widgets:
+                    - label:
+                        id: lbl_btn_1
+                        text: "󱁑"
+                        text_font: font_mdi
+                        align: center
+                  on_click:
+                    then:
+                      - homeassistant.action:
+                          action: light.toggle
+                          data:
+                            entity_id: light.decke_homeoffice
+                      - binary_sensor.template.publish:
+                          id: button_1_pressed
+                          state: ON
+                      - delay: 500ms
+                      - binary_sensor.template.publish:
+                          id: button_1_pressed
+                          state: OFF
+              - button:
+                  id: btn_2
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 0
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  checkable: true
+                  widgets:
+                    - label:
+                        id: lbl_btn_2
+                        text: "󰈐"
+                        text_font: font_mdi
+                        align: center
+                  on_click:
+                    then:
+                      - homeassistant.action:
+                          action: light.toggle
+                          data:
+                            entity_id: light.spots_ho
+                      - binary_sensor.template.publish:
+                          id: button_2_pressed
+                          state: ON
+                      - delay: 500ms
+                      - binary_sensor.template.publish:
+                          id: button_2_pressed
+                          state: OFF
+
+              - button:
+                  id: btn_3
+                  grid_cell_column_pos: 2
+                  grid_cell_row_pos: 0
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  checkable: true
+                  widgets:
+                    - label:
+                        id: lbl_btn_3
+                        text: "󰤝"
+                        text_font: font_mdi
+                        align: center
+                  on_click:
+                    then:
+                      - homeassistant.action:
+                          action: light.toggle
+                          data:
+                            entity_id: light.homeoffice_desklamp
+                      - binary_sensor.template.publish:
+                          id: button_3_pressed
+                          state: ON
+                      - delay: 500ms
+                      - binary_sensor.template.publish:
+                          id: button_3_pressed
+                          state: OFF
+
+              - button:
+                  id: btn_4
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 1
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  bg_color: default_button_bg_color
+                  pressed:
+                    bg_color: default_button_pressed_bg_color
+                  widgets:
+                    - label:
+                        id: lbl_btn_4
+                        text: "󰟽"
+                        text_font: font_mdi
+                        align: center
+                  on_click:
+                    then:
+                     - lvgl.page.show: sub_page
+
+              - button:
+                  id: btn_5
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 1
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  bg_color: default_button_bg_color
+                  pressed:
+                    bg_color: default_button_pressed_bg_color
+                  widgets:
+                    - label:
+                        id: lbl_btn_5
+                        text: "--:--"
+                        text_font: arimo30
+                        align: center
+                  on_click:
+                    then:
+                      - binary_sensor.template.publish:
+                          id: button_5_pressed
+                          state: ON
+                      - delay: 500ms
+                      - binary_sensor.template.publish:
+                          id: button_5_pressed
+                          state: OFF
+
+
+              - button:
+                  id: btn_6
+                  grid_cell_column_pos: 2
+                  grid_cell_row_pos: 1
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  checkable: true
+                  widgets:
+                    - label:
+                        id: lbl_btn_6
+                        text: "󰤝"
+                        text_font: font_mdi
+                        align: center
+                  on_click:
+                    then:
+                      - homeassistant.action:
+                          action: switch.toggle
+                          data:
+                            entity_id: switch.dinolampe
+                      - binary_sensor.template.publish:
+                          id: button_3_pressed
+                          state: ON
+                      - delay: 500ms
+                      - binary_sensor.template.publish:
+                          id: button_3_pressed
+                          state: OFF
+
+              - button:
+                  id: btn_7
+                  grid_cell_column_pos: 0
+                  grid_cell_row_pos: 2
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  bg_color: default_button_bg_color
+                  pressed:
+                    bg_color: default_button_pressed_bg_color
+                  widgets:
+                    - label:
+                        id: lbl_btn_7
+                        text: "--.-°C"
+                        text_font: arimo30
+                        align: center
+
+
+              - button:
+                  id: btn_8
+                  grid_cell_column_pos: 1
+                  grid_cell_row_pos: 2
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  bg_color: default_button_bg_color
+                  pressed:
+                    bg_color: default_button_pressed_bg_color
+                  widgets:
+                    - label:
+                        id: lbl_btn_8
+                        text: "--.-%"
+                        text_font: arimo30
+                        align: center
+
+
+              - button:
+                  id: btn_9
+                  grid_cell_column_pos: 2
+                  grid_cell_row_pos: 2
+                  grid_cell_x_align: STRETCH
+                  grid_cell_y_align: STRETCH
+                  bg_color: default_button_bg_color
+                  pressed:
+                    bg_color: default_button_pressed_bg_color
+                  widgets:
+                    - label:
+                        id: lbl_btn_9
+                        text: "--"
+                        text_font: arimo30
+                        align: center
+
+                 
+        # Sub page for adding new buttons etc
+    - id: sub_page
+      pad_all: 0
+      widgets:
+        - obj:
+            width: 320
+            height: 240
+            bg_color: room_bg_color
+            layout:
+              type: grid
+              grid_columns: [fr(1), fr(1), fr(1)]
+              grid_rows: [fr(1), fr(1), fr(1)]
+            pad_all: 5px
+            outline_pad: 5px
+            widgets:
+              # Add new buttons/widgets here
+            - button:
+                id: btn_10
+                grid_cell_column_pos: 0
+                grid_cell_row_pos: 0
+                grid_cell_x_align: STRETCH
+                grid_cell_y_align: STRETCH
+                checkable: true
+                widgets:
+                  - label:
+                      id: lbl_btn_10
+                      text: "󰤝"
+                      text_font: font_mdi
+                      align: center
+                on_click:
+                  then:
+                    - homeassistant.action:
+                        action: switch.toggle
+                        data:
+                          entity_id: switch.3d_drucker
+                    - binary_sensor.template.publish:
+                        id: button_10_pressed
+                        state: ON
+                    - delay: 500ms
+                    - binary_sensor.template.publish:
+                        id: button_10_pressed
+                        state: OFF
+
+            - button:
+                id: btn_11
+                grid_cell_column_pos: 0
+                grid_cell_row_pos: 1
+                grid_cell_x_align: STRETCH
+                grid_cell_y_align: STRETCH
+                checkable: true
+                widgets:
+                  - label:
+                      id: lbl_btn_11
+                      text: "CR10"
+                      text_font: arimo36
+                      align: center
+                on_click:
+                  then:
+                    - homeassistant.action:
+                        action: switch.toggle
+                        data:
+                          entity_id: switch.drucker
+                    - binary_sensor.template.publish:
+                        id: button_11_pressed
+                        state: ON
+                    - delay: 500ms
+                    - binary_sensor.template.publish:
+                        id: button_11_pressed
+                        state: OFF
+
+            - button:
+                id: btn_13
+                grid_cell_column_pos: 1
+                grid_cell_row_pos: 1
+                grid_cell_x_align: STRETCH
+                grid_cell_y_align: STRETCH
+                checkable: true
+                widgets:
+                  - label:
+                      id: lbl_btn_13
+                      text: "󰌑"
+                      text_font: font_mdi
+                      align: center
+                on_click:
+                  then:
+                    - homeassistant.action:
+                        action: switch.toggle
+                        data:
+                          entity_id: switch.cr10_leds
+                    - binary_sensor.template.publish:
+                        id: button_13_pressed
+                        state: ON
+                    - delay: 500ms
+                    - binary_sensor.template.publish:
+                        id: button_13_pressed
+                        state: OFF
+
+            - button:
+                id: btn_14
+                grid_cell_column_pos: 1
+                grid_cell_row_pos: 2
+                grid_cell_x_align: STRETCH
+                grid_cell_y_align: STRETCH
+                checkable: true
+                widgets:
+                  - label:
+                      id: lbl_btn_14
+                      text: "󰌑"
+                      text_font: font_mdi
+                      align: center
+                on_click:
+                  then:
+                    - homeassistant.action:
+                        action: switch.toggle
+                        data:
+                          entity_id: switch.cr6_leds
+                    - binary_sensor.template.publish:
+                        id: button_14_pressed
+                        state: ON
+                    - delay: 500ms
+                    - binary_sensor.template.publish:
+                        id: button_14_pressed
+                        state: OFF
+
+            - button:
+                id: btn_12
+                grid_cell_column_pos: 0
+                grid_cell_row_pos: 2
+                grid_cell_x_align: STRETCH
+                grid_cell_y_align: STRETCH
+                checkable: true
+                widgets:
+                  - label:
+                      id: lbl_btn_12
+                      text: "CR6"
+                      text_font: arimo36
+                      align: center
+                on_click:
+                  then:
+                    - homeassistant.action:
+                        action: switch.toggle
+                        data:
+                          entity_id: switch.drucker2
+                    - binary_sensor.template.publish:
+                        id: button_12_pressed
+                        state: ON
+                    - delay: 500ms
+                    - binary_sensor.template.publish:
+                        id: button_12_pressed
+                        state: OFF
+
+            - button:
+                id: btn_18
+                grid_cell_column_pos: 2
+                grid_cell_row_pos: 0
+                grid_cell_row_span: 3
+                grid_cell_x_align: STRETCH
+                grid_cell_y_align: STRETCH
+                bg_color: default_button_bg_color
+                pressed:
+                  bg_color: default_button_pressed_bg_color
+                widgets:
+                  - label:
+                      id: lbl_btn_18
+                      text: "󰌑"
+                      text_font: font_mdi
+                      align: center
+                on_click:
+                  then:
+                  - lvgl.page.show: main_page
