@@ -677,7 +677,7 @@ lvgl:
                   widgets:
                     - label:
                         id: lbl_btn_6
-                        text: "󰤝"
+                        text: "󱍢"
                         text_font: font_mdi
                         align: center
 
