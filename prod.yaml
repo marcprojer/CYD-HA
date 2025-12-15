@@ -186,21 +186,21 @@ switch:
 # These sensors mirror the state of Home Assistant entities on boot,
 # or whenever the entity's state changes. 
 text_sensor:
-# Show Dyson vent air quality index on btn_9
+# Show outdoor temperature on btn_9 (aqara loggia)
   - platform: homeassistant
-    id: dyson_vent_aqi
-    entity_id: sensor.dyson_vent_air_quality_index
+    id: aqara_temp_logia
+    entity_id: sensor.aqara_temp_logia_temperature
     on_value:
       then:
         - lvgl.label.update:
             id: lbl_btn_9
             text: !lambda |-
-              static char buf[8];
-              int aqi = 0;
+              static char buf[16];
+              float temp = 0.0f;
               if (!x.empty()) {
-                aqi = std::stoi(x);
+                temp = std::stof(x);
               }
-              snprintf(buf, sizeof(buf), "%d", aqi);
+              snprintf(buf, sizeof(buf), "%.1f°C", temp);
               return buf;
 
 # Show Dyson vent humidity on btn_8
@@ -727,7 +727,7 @@ lvgl:
                   widgets:
                     - label:
                         id: lbl_btn_9
-                        text: "--"
+                        text: "--.-°C"
                         text_font: arimo30
                         align: center
 
